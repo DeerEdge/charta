@@ -1,0 +1,47 @@
+/* styles.css */
+body {
+    background-color: #1f2539;
+    color: #ffffff;
+}
+
+.header-container {
+    background-color: #1f2539;
+    color: #1f2539;
+    padding: 20px;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.app-title {
+    margin: 0;
+    color: #ffffff;
+}
+
+.tabs-container {
+    background-color: #1f2539;
+    color: #7296f7;
+    margin-left: auto;
+}
+
+.tab {
+    background-color: #1f2539;
+    color: #ffffff;
+    padding-left: 50px;
+    padding-right: 50px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border: none;
+}
+
+.tab--selected {
+    color: #7296f7;
+}
+
+.content-container {
+    margin-top: 20px;
+    padding: 20px;
+}
