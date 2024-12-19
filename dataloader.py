@@ -1,7 +1,8 @@
 import yfinance as yf
-dat = yf.Ticker("MSFT")
 
-def get_ticker_history(symbol):
+def get_ticker_history(symbol, period):
     ticker = yf.Ticker(symbol)
-    data = ticker.history()
+    data = ticker.history(period=period)
+    print(type(data))
     print(data)
+    return data

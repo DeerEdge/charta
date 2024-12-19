@@ -1,9 +1,13 @@
-# app.py
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 from dash import html, dcc, Output, Input, Dash
 import dash_bootstrap_components as dbc
+import plotly.express as px
+from dataloader import *
+from dash import dash_table
+import pandas as pd
+from dash import Dash, dcc, html, Input, Output, callback
 
 # Initialize the Dash app
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -59,10 +63,32 @@ app.layout = html.Div([
 )
 def render_content(tab):
     if tab == 'home':
+        df = get_ticker_history("AAPL", "1y") # Period options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+
         return html.Div([
-            html.H3('Welcome to the Home Tab'),
-            html.P('This is where you can find an overview of our application.')
+            html.H3('Trade Tab'),
+            html.P('This section is dedicated to trading features and tools.'),
+
+            dcc.Input(id="dfalse", type="number", placeholder="Enter Symbol"),
+            html.P("Number of Rows:" + str(df.shape[0])),
+
+            dash_table.DataTable(
+                id='table',
+                columns=[{"name": i, "id": i} for i in df.columns],
+                data=df.to_dict('records'),
+                style_table={'overflowX': 'auto'},
+                style_cell={
+                    'backgroundColor': '#1f2539',
+                    'color': 'white',
+                    'textAlign': 'left'
+                },
+                style_header={
+                    'backgroundColor': '#35394c',
+                    'fontWeight': 'bold'
+                }
+            )
         ])
+
     elif tab == 'learn':
         return html.Div([
             html.H3('Learn Tab'),
@@ -71,7 +97,8 @@ def render_content(tab):
     elif tab == 'trade':
         return html.Div([
             html.H3('Trade Tab'),
-            html.P('This section is dedicated to trading features and tools.')
+            html.P('This section is dedicated to trading features and tools.'),
+            html.P(get_ticker_history("GOOG"))
         ])
 
 
