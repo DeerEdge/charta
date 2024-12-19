@@ -69,24 +69,13 @@ def render_content(tab):
             html.H3('Trade Tab'),
             html.P('This section is dedicated to trading features and tools.'),
 
-            dcc.Input(id="dfalse", type="number", placeholder="Enter Symbol"),
-            html.P("Number of Rows:" + str(df.shape[0])),
+            html.Div([
+                dcc.Input(id="symbol_field", type="text", placeholder="Enter Symbol"),
+                html.Div(id="ticker_label", style={'display': 'inline-block', 'margin-left': '10px'})
+            ], style={'margin-bottom': '20px'}),
 
-            dash_table.DataTable(
-                id='table',
-                columns=[{"name": i, "id": i} for i in df.columns],
-                data=df.to_dict('records'),
-                style_table={'overflowX': 'auto'},
-                style_cell={
-                    'backgroundColor': '#1f2539',
-                    'color': 'white',
-                    'textAlign': 'left'
-                },
-                style_header={
-                    'backgroundColor': '#35394c',
-                    'fontWeight': 'bold'
-                }
-            )
+            html.Div(id="num_rows_label"),
+            html.Div(id="table_container")  # DataTable
         ])
 
     elif tab == 'learn':
@@ -101,6 +90,64 @@ def render_content(tab):
             html.P(get_ticker_history("GOOG"))
         ])
 
+@app.callback(
+    Output("ticker_label", "children"),
+    Input("symbol_field", "value")
+)
+def update_ticker_label(value):
+    if value and value.strip():
+        try:
+            yf.Ticker(value.strip()).info  # This will raise an exception if the ticker is invalid
+            return f"Valid ticker: {value.upper()}"
+        except:
+            return "Invalid ticker"
+    return ""
+
+@app.callback(
+    Output("table_container", "children"),
+    Input("symbol_field", "value")
+)
+def update_price_table(value):
+    if value and value.strip():
+        try:
+            df = get_ticker_history(value.strip(), "1y")
+            print(df.shape)
+            if df.shape[0] == 0:
+                raise ValueError
+            table = dash_table.DataTable(
+                id='table',
+                columns=[{"name": i, "id": i} for i in df.columns],
+                data=df.to_dict('records'),
+                style_table={'overflowX': 'auto'},
+                style_cell={
+                    'backgroundColor': '#1f2539',
+                    'color': 'white',
+                    'textAlign': 'left'
+                },
+                style_header={
+                    'backgroundColor': '#35394c',
+                    'fontWeight': 'bold'
+                }
+            )
+            return table
+        except:
+            return html.Div("No data available for this ticker")
+    return None
+
+@app.callback(
+    Output("num_rows_label", "children"),
+    Input("symbol_field", "value")
+)
+def update_num_rows_label(value):
+    if value and value.strip():
+        try:
+            df = get_ticker_history(value.strip(), "1y")
+            if df.shape[0] == 0:
+                raise ValueError
+            return html.Div("Number of Rows:" + str(df.shape[0]))
+        except:
+            pass
+    return None
 
 # Run the app
 if __name__ == '__main__':
