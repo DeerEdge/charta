@@ -45,3 +45,23 @@ body {
     margin-top: 20px;
     padding: 20px;
 }
+
+.period-selector .period-selector-input {
+    display: none;
+}
+
+.period-selector .period-selector-label {
+    display: inline-block;
+    padding: 10px 15px;
+    margin-right: 10px;
+    background-color: #1f2539;
+    color: #ffffff;
+    border: 1px solid #7296f7;
+    cursor: pointer;
+    text-align: center;
+}
+
+.period-selector .period-selector-input:checked + .period-selector-label {
+    background-color: #7296f7;
+    color: #1f2539;
+}

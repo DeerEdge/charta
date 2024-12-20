@@ -2,19 +2,27 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 from dash import html, dcc, Output, Input, Dash
+import datetime
+import os
 import dash_bootstrap_components as dbc
 import plotly.express as px
+from websockets.asyncio.async_timeout import timeout
+
 from dataloader import *
 from dash import dash_table
 import pandas as pd
 from dash import Dash, dcc, html, Input, Output, callback
 import plotly.graph_objects as go
+from flask_caching import Cache
 
 # Initialize the Dash app
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
-app.layout = dbc.Container([
-    dcc.Graph(id="graph")
-])
+cache = Cache(app.server, config={
+    'CACHE_TYPE': 'filesystem',
+    'CACHE_DIR': 'cache-directory'
+})
+app.config.suppress_callback_exceptions = True
+timeout = 2000
 
 tab_style = {
     'backgroundColor': '#1f2539',
@@ -64,20 +72,63 @@ app.layout = html.Div([
 )
 def render_content(tab):
     if tab == 'home':
-        df = get_ticker_history("AAPL", "max") # Period options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
-
+        # Period options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
         return html.Div([
-            html.H3('Trade Tab'),
-            html.P('This section is dedicated to trading features and tools.'),
-
             html.Div([
                 dcc.Input(id="symbol_field", type="text", placeholder="Enter Symbol"),
                 html.Div(id="ticker_label", style={'display': 'inline-block', 'margin-left': '10px'})
             ], style={'margin-bottom': '20px'}),
-            dcc.Graph(id="candlestick_chart"),
 
+            html.Div([
+                dcc.RadioItems(
+                    id='period-selector',
+                    options=[
+                        {'label': '1D', 'value': '1d'},
+                        {'label': '5D', 'value': '5d'},
+                        {'label': '1M', 'value': '1mo'},
+                        {'label': '3M', 'value': '3mo'},
+                        {'label': '6M', 'value': '6mo'},
+                        {'label': '1Y', 'value': '1y'},
+                        {'label': 'YTD', 'value': 'ytd'},
+                        {'label': 'MAX', 'value': 'max'}
+                    ],
+                    value='max',
+                    inline=True,
+                    style={
+                        'display': 'flex',
+                        'flexWrap': 'wrap',
+                        'gap': '10px'
+                    },
+                    inputStyle={'display': 'none'},
+                    labelStyle={
+                        'display': 'inline-block',
+                        'padding': '10px 15px',
+                        'backgroundColor': '#1f2539',
+                        'color': '#ffffff',
+                        'border': '1px solid #7296f7',
+                        'cursor': 'pointer',
+                        'textAlign': 'center'
+                    },
+                    className='period-selector'
+                )
+            ], style={'marginBottom': '20px'}),
+
+            dcc.Graph(
+                id="candlestick_chart",
+                figure=go.Figure(data=[go.Candlestick()]).update_layout(
+                    title="Enter a ticker symbol",
+                    xaxis_title="Date",
+                    yaxis_title="Price",
+                    xaxis_rangeslider_visible=True,
+                    template="plotly_dark",
+                    height=600,
+                    width=800
+                )
+            ),
+            
             html.Div(id="num_rows_label"),
             html.Div(id="table_container")  # DataTable
+
         ])
 
     elif tab == 'learn':
@@ -91,6 +142,11 @@ def render_content(tab):
             html.P('This section is dedicated to trading features and tools.'),
             html.P(get_ticker_history("GOOG"))
         ])
+
+@cache.memoize(timeout=timeout)
+def get_cached_ticker_history(symbol, period):
+    return get_ticker_history(symbol, period)
+
 
 # Update Stock Symbol Label
 @app.callback(
@@ -106,15 +162,16 @@ def update_ticker_label(value):
             return "Invalid ticker"
     return ""
 
+
 # Update Stock Price Table
 @app.callback(
     Output("table_container", "children"),
-    Input("symbol_field", "value")
-)
-def update_price_table(value):
+    [Input("symbol_field", "value"),
+     Input("period-selector", "value")])
+def update_price_table(value, period):
     if value and value.strip():
         try:
-            df = get_ticker_history(value.strip(), "max")
+            df = get_cached_ticker_history(value.strip(), period)
             print(df.shape)
             if df.shape[0] == 0:
                 raise ValueError
@@ -138,15 +195,16 @@ def update_price_table(value):
             return html.Div("No data available for this ticker")
     return None
 
+
 # Update Num Rows Label
 @app.callback(
     Output("num_rows_label", "children"),
-    Input("symbol_field", "value")
-)
-def update_num_rows_label(value):
+    [Input("symbol_field", "value"),
+     Input("period-selector", "value")])
+def update_num_rows_label(value, period):
     if value and value.strip():
         try:
-            df = get_ticker_history(value.strip(), "max")
+            df = get_cached_ticker_history(value.strip(), period)
             if df.shape[0] == 0:
                 raise ValueError
             return html.Div("Number of Rows:" + str(df.shape[0]))
@@ -154,14 +212,17 @@ def update_num_rows_label(value):
             pass
     return None
 
+
 # Update Candlestick chart
 @app.callback(
     Output("candlestick_chart", "figure"),
-    Input("symbol_field", "value"))
-def display_candlestick(value):
+    [Input("symbol_field", "value"),
+     Input("period-selector", "value")])
+@cache.memoize(timeout=timeout)
+def display_candlestick(value, period):
     if value and value.strip():
         try:
-            df = get_ticker_history(value.strip(), "max")
+            df = get_cached_ticker_history(value.strip(), period)
             print(f"DataFrame shape: {df.shape}")
             print(f"DataFrame columns: {df.columns}")
             print(df.head())  # Print first few rows
@@ -185,7 +246,7 @@ def display_candlestick(value):
                 title=f"{value.upper()} Stock Price",
                 xaxis_title="Date",
                 yaxis_title="Price",
-                xaxis_rangeslider_visible=False,
+                xaxis_rangeslider_visible=True,
                 template="plotly_dark",
                 height=600,
                 width=800
@@ -194,8 +255,46 @@ def display_candlestick(value):
             return fig
         except Exception as e:
             print(f"Error in display_candlestick: {e}")
-            return go.Figure()
-    return go.Figure()
+            fig = go.Figure(data=[go.Candlestick()])
+            fig.update_layout(
+                title=f"{value.upper()} Stock Price",
+                xaxis_title="Date",
+                yaxis_title="Price",
+                xaxis_rangeslider_visible=True,
+                template="plotly_dark",
+                height=600,
+                width=800
+            )
+            return fig
+    fig = go.Figure(data=[go.Candlestick()])
+    fig.update_layout(
+        title=f"{value.upper()} Stock Price",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        xaxis_rangeslider_visible=True,
+        template="plotly_dark",
+        height=600,
+        width=800
+    )
+    return fig
+
+
+# Period Highlighting
+@app.callback(
+    Output('period-selector', 'labelStyle'),
+    Input('period-selector', 'value')
+)
+def update_button_style(selected_value):
+    return {
+        'display': 'inline-block',
+        'padding': '10px 15px',
+        'backgroundColor': '#7296f7' if selected_value == 'value' else '#1f2539',
+        'color': '#1f2539' if selected_value == 'value' else '#ffffff',
+        'border': '1px solid #7296f7',
+        'cursor': 'pointer',
+        'textAlign': 'center'
+    }
+
 
 
 # Run the app
