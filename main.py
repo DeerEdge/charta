@@ -2,6 +2,11 @@ import gradio as gr
 import pandas as pd
 import plotly.graph_objects as go
 import yfinance as yf
+from bokeh.embed import file_html
+from bokeh.resources import CDN
+from backtesting import Backtest, Strategy
+from backtesting.lib import crossover
+
 
 
 def get_stock_data(symbol, period):
@@ -39,30 +44,114 @@ def update_table(symbol, period):
         return "No data available for this ticker"
     return df
 
+def show_table(symbol, period):
+    df = update_table(symbol, period)
+    return gr.DataFrame(visible=True), df
+
+
+def run_backtest(df, strategy_code):
+    try:
+        # Compile the user-provided strategy code to check for syntax errors
+        compile(strategy_code, '<string>', 'exec')
+
+        # Execute the user-provided strategy code
+        exec(strategy_code, globals())
+
+        # Find the last defined class in the global namespace
+        strategy_classes = [obj for obj in globals().values() if isinstance(obj, type) and issubclass(obj, Strategy)]
+        if not strategy_classes:
+            return "No valid Strategy class found in the code", None
+
+        strategy_class = strategy_classes[-1]
+        df.reset_index(inplace=True)
+
+        bt = Backtest(df, strategy_class, cash=10000, commission=.002)
+        stats = bt.run()
+
+        # Generate the plot
+        plot = bt.plot()
+
+        # Convert stats to a DataFrame
+        stats_df = pd.DataFrame({'Metric': stats.index, 'Value': stats.values})
+
+        return stats_df, plot
+    except SyntaxError as e:
+        return f"Syntax error in strategy code: {e}", None
+    except Exception as e:
+        print("out")
+        return str(e), None
+
+
 # View
 with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
     gr.Markdown("# Charta")
     with gr.Tab("Home"):
         with gr.Row():
             with gr.Column(scale=2):
-                symbol_input = gr.Textbox(label="Enter Symbol")
+                with gr.Row():
+                    symbol_input = gr.Textbox(label="Enter Symbol", scale=7)
+                    chart_button = gr.Button("Chart", scale=1)
                 period_input = gr.Radio(
                     ["1d", "5d", "1mo", "3mo", "6mo", "1y", "ytd", "max"],
                     label="Select Period",
                     value="max"
                 )
                 chart_output = gr.Plot()
-                table_output = gr.DataFrame()
+                show_table_button = gr.Button("Show historical data as table")
+                table_output = gr.DataFrame(visible=False)
+                backtest_button = gr.Button("Run Backtest")
+                backtest_stats = gr.Dataframe(label="Backtest Statistics")
+                backtest_plot = gr.Plot(label="Backtest Plot")
             with gr.Column(scale=1):
-                strategy_input = gr.Textbox(
-                    label="Enter your trading strategy code here",
-                    lines=20
+                strategy_input = gr.Code(
+                    label="Strategy Code:",
+                    language="python",
+                    lines=30,
+                    value=
+                """
+                from backtesting import Strategy
+from backtesting.lib import crossover
+
+def SMA(values, n):
+    return pd.Series(values).rolling(n).mean()
+
+class SmaCross(Strategy):
+    n1 = 10
+    n2 = 20
+
+    def init(self):
+        self.sma1 = self.I(SMA, self.data.Close, self.n1)
+        self.sma2 = self.I(SMA, self.data.Close, self.n2)
+
+    def next(self):
+        if crossover(self.sma1, self.sma2):
+            self.position.close()
+            self.buy()
+        elif crossover(self.sma2, self.sma1):
+            self.position.close()
+            self.sell()
+                """
                 )
 
-        symbol_input.change(update_chart, inputs=[symbol_input, period_input], outputs=chart_output)
+        chart_button.click(update_chart, inputs=[symbol_input, period_input], outputs=chart_output)
         period_input.change(update_chart, inputs=[symbol_input, period_input], outputs=chart_output)
-        symbol_input.change(update_table, inputs=[symbol_input, period_input], outputs=table_output)
+        chart_button.click(update_table, inputs=[symbol_input, period_input], outputs=table_output)
         period_input.change(update_table, inputs=[symbol_input, period_input], outputs=table_output)
+
+
+        def backtest_handler(symbol, period, strategy_code):
+            df = get_stock_data(symbol, period)
+            if df.empty:
+                return "No data available for this ticker", None
+            stats, plot = run_backtest(df, strategy_code)
+            return stats, plot
+
+
+        backtest_button.click(
+            backtest_handler,
+            inputs=[symbol_input, period_input, strategy_input],
+            outputs=[backtest_stats, backtest_plot]
+        )
 
     with gr.Tab("Learn"):
         gr.Markdown("## Learn Tab")
