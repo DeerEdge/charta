@@ -6,8 +6,9 @@ from bokeh.embed import file_html
 from bokeh.resources import CDN
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
+from cerebras.cloud.sdk import Cerebras
 
-
+cerebras_client = Cerebras(api_key='key')
 
 def get_stock_data(symbol, period):
     try:
@@ -82,6 +83,23 @@ def run_backtest(df, strategy_code):
         return str(e), None
 
 
+def chat_with_ai(message, history):
+    messages = [{"role": "system", "content": "You are a helpful assistant specializing in stock trading strategies."}]
+
+    for human, ai in history:
+        messages.append({"role": "user", "content": human})
+        messages.append({"role": "assistant", "content": ai})
+
+    messages.append({"role": "user", "content": message})
+
+    response = cerebras_client.chat.completions.create(
+        model="llama3.1-70b",
+        messages=[{"role": "user", "content": message}]
+    )
+
+    return [{"role": "assistant", "content": response.choices[0].message.content}]
+
+
 # View
 with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
     gr.Markdown("# Charta")
@@ -133,10 +151,16 @@ class SmaCross(Strategy):
                 """
                 )
 
+                chat_input = gr.Textbox(label="Chat with AI", placeholder="Ask about trading strategies...")
+                chat_output = gr.Chatbot(label="AI Assistant", type="messages")
+                clear_button = gr.Button("Clear Chat")
+
         chart_button.click(update_chart, inputs=[symbol_input, period_input], outputs=chart_output)
         period_input.change(update_chart, inputs=[symbol_input, period_input], outputs=chart_output)
         chart_button.click(update_table, inputs=[symbol_input, period_input], outputs=table_output)
         period_input.change(update_table, inputs=[symbol_input, period_input], outputs=table_output)
+        chat_input.submit(chat_with_ai, inputs=[chat_input, chat_output], outputs=[chat_output])
+        clear_button.click(lambda: None, None, chat_output, queue=False)
 
 
         def backtest_handler(symbol, period, strategy_code):
