@@ -8,7 +8,7 @@ from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
 from cerebras.cloud.sdk import Cerebras
 
-cerebras_client = Cerebras(api_key='csk-cwyh8r2xycv83wm2h2mp4wy6dtx5ymc44pnj6586rj5v5fmx')
+cerebras_client = Cerebras(api_key='')
 
 def get_stock_data(symbol, period):
     try:
