@@ -7,11 +7,12 @@ import os
 
 from keys import *
 from supabase import create_client, Client
+from tasks.db_funcs import *
 
 # AlphaVantage Usage limited to 25 hits a day, maybe cache once every 30 mins???
 
-url: str = os.environ.get(SUPABASE_URL)
-key: str = os.environ.get(SUPABASE_KEY)
+url: str = SUPABASE_URL
+key: str = SUPABASE_SERVICE_ROLE_KEY
 supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="Options View")
@@ -21,8 +22,6 @@ ticker = st.selectbox("Choose a ticker", ["AAPL", "SPY", "TSLA", "GOOG", "NVDA"]
 url = f'https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol={ticker}&apikey={ALPHAVANTAGE_KEY}'
 r = requests.get(url)
 data = r.json()
-
-print(data)
 
 st.subheader("Recent Options Data")
 st.write(data)
@@ -56,3 +55,4 @@ with st.expander("Show Greeks Charts"):
         ax.grid(True)
         st.pyplot(fig)
 
+insert_data(supabase, 1)
