@@ -10,6 +10,7 @@ from supabase import create_client, Client
 from tasks.db_funcs import *
 
 # AlphaVantage Usage limited to 25 hits a day, maybe cache once every 30 mins???
+# Have to check across NYSE tickers 
 
 url: str = SUPABASE_URL
 key: str = SUPABASE_SERVICE_ROLE_KEY
@@ -18,7 +19,7 @@ supabase: Client = create_client(url, key)
 st.set_page_config(page_title="Options View")
 st.title("Options Data Viewer")
 
-ticker = st.selectbox("Choose a ticker", ["AAPL", "SPY", "TSLA", "GOOG", "NVDA"])
+ticker = st.text_input("Enter a ticker symbol", value="AAPL").upper()
 url = f'https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol={ticker}&apikey={ALPHAVANTAGE_KEY}'
 r = requests.get(url)
 data = r.json()
@@ -32,12 +33,13 @@ df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
 df["mark"] = pd.to_numeric(df["mark"], errors="coerce")
 df = df.dropna(subset=["strike", "mark"])
 
-fig, ax = plt.subplots()
-ax.plot(df["strike"], df["mark"], marker='o')
-ax.set_xlabel("Strike")
-ax.set_ylabel("Mark Price")
-ax.set_title(f"{ticker} Call Options: Strike vs Price")
-st.pyplot(fig)
+with st.expander("Strike v. Price"):
+    fig, ax = plt.subplots()
+    ax.plot(df["strike"], df["mark"], marker='o')
+    ax.set_xlabel("Strike")
+    ax.set_ylabel("Mark Price")
+    ax.set_title(f"{ticker} Call Options: Strike vs Price")
+    st.pyplot(fig)
 
 with st.expander("Show Greeks Charts"):
     # Convert Greek columns
@@ -55,4 +57,4 @@ with st.expander("Show Greeks Charts"):
         ax.grid(True)
         st.pyplot(fig)
 
-insert_data(supabase, 1)
+
