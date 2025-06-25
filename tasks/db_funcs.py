@@ -5,11 +5,24 @@ import matplotlib.pyplot as plt
 import os
 
 
-def insert_data(supabase, id, json_data={}):
+def insert_data(supabase, ticker, table, json_data):
     (
-        supabase.table("ALPHAVANTAGE_OPTIONS_HISTORICAL_DATA")
-        .insert({"id": id, "data": json_data})
+        supabase.table(table)
+        .insert({"ticker": ticker, "data": json_data})
         .execute()
     )
-    print("Inserted into table")
+
+    print("Inserted into table at ticker: ", ticker)
+
+def fetch_data(supabase, ticker, table):
+    response = (
+        supabase.table(table)
+        .select('*')
+        .eq("ticker", ticker)
+        .limit(1)
+        .execute()
+    )
+
+    print(response)
+    return response.data
 

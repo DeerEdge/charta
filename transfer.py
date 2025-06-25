@@ -4,20 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-from keys import *
-from supabase import create_client, Client
 from tasks.db_funcs import *
 from tasks.ticker_data_funcs import *
+from globs import *
 
 # AlphaVantage Usage limited to 25 hits a day, maybe cache once every 30 mins???
 # Since there are 3000+ tickers, we pull historical data and store in db and refer to db data intraday
 # Have to check across NYSE tickers
-
-nyse_tickers_path = "tasks/nyse_tickers.txt"
-nasdaq_tickers_path = "tasks/nasdaq_tickers.txt"
-url: str = SUPABASE_URL
-key: str = SUPABASE_SERVICE_ROLE_KEY
-supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="Options View")
 st.title("Options Data Viewer")
@@ -28,10 +21,11 @@ all_tickers = all_nyse_tickers.union(all_nasdaq_tickers)
 
 ticker = st.text_input("Enter a ticker symbol", value="AAPL").upper()
 
+if st.button("Pull data"):
+    print(get_ticker_data(supabase, ticker, historical_data_table))
+
 if ticker in all_tickers:
-    url = f'https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol={ticker}&apikey={ALPHAVANTAGE_KEY}'
-    r = requests.get(url)
-    data = r.json()
+    data = get_ticker_data(supabase, ticker, historical_data_table)
 
     st.subheader("Recent Options Data")
     st.write(data)
